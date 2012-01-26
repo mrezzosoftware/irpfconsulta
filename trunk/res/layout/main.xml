@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget32"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent" >
+
+    <TableLayout
+        android:id="@+id/widget43"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:orientation="vertical"
+        android:stretchColumns="1" >
+
+        <TableRow
+            android:id="@+id/widget44"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/lblCPF"
+                android:layout_width="43px"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="CPF:" />
+
+            <EditText
+                android:id="@+id/txtCpf"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:hint="Digite o CPF"
+                android:textSize="18sp" />
+        </TableRow>
+
+        <TableRow
+            android:id="@+id/widget46"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/lblCaptcha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="Captcha:" />
+
+            <EditText
+                android:id="@+id/txtCaptcha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:hint="Digite o texto da imagem"
+                android:textSize="18sp" />
+        </TableRow>
+
+        <TableRow
+            android:id="@+id/widget107"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <Button
+                android:id="@+id/btnConsultar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Consultar" />
+        </TableRow>
+    </TableLayout>
+
+</RelativeLayout>
