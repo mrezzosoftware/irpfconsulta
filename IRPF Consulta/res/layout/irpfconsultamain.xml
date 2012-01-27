@@ -84,20 +84,14 @@
                 android:layout_height="wrap_content"
                 android:hint="Digite o texto da imagem"
                 android:textSize="18sp" />
-
-            <ImageView
-                android:id="@+id/imgCaptcha"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
         </TableRow>
     </TableLayout>
-
+    
     <ImageView
-        android:id="@+id/imgCaptcha"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:src="@drawable/procurar" />
+                android:id="@+id/imgCaptcha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"/>
 
     <ImageButton
         android:id="@+id/btnConsultar"
