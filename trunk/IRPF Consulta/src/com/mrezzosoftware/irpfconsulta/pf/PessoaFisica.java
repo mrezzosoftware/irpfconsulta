@@ -1,14 +1,14 @@
 package com.mrezzosoftware.irpfconsulta.pf;
 
-public class DadosPF {
+public class PessoaFisica {
 	
 	private String cpf;
 	private String ano;
 	private String captcha;
 	
-	public DadosPF() {}
+	public PessoaFisica() {}
 	
-	public DadosPF(String cpf, String ano, String captcha) {
+	public PessoaFisica(String cpf, String ano, String captcha) {
 		super();
 		this.cpf = cpf;
 		this.ano = ano;
