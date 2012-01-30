@@ -1,32 +1,17 @@
 package com.mrezzosoftware.irpfconsulta;
 
-import java.io.IOException;
-import java.util.List;
-
-import org.apache.http.Header;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.CookieStore;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.protocol.ClientContext;
-import org.apache.http.cookie.Cookie;
-import org.apache.http.impl.client.BasicCookieStore;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
-
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.mrezzosoftware.irpfconsulta.connection.RFConnection;
@@ -36,11 +21,14 @@ public class IRPFConsultaMain extends Activity {
 
 	private static final String LOGCAT_TAG = "irpf";
 	private EditText txtCpf;
-	private Spinner cboAno;
+	private AlertDialog.Builder dialogAnos;
+	private String[] anosDisponiveis;
+	private Button btnAnos;
 	private EditText txtCaptcha;
 	private Bitmap captcha;
 	private ImageView imgRecarregar;
-	private ImageView imgCaptcha;
+	// Futuro robô para ler o captcha.
+	//private ImageView imgCaptcha;
 	private ImageButton btConsultar;
 	private RFConnection rfConnection = new RFConnection();
 
@@ -51,14 +39,22 @@ public class IRPFConsultaMain extends Activity {
 		setContentView(R.layout.irpfconsultamain);
 
 		txtCpf = (EditText) findViewById(R.id.txtCpf);
-
-		cboAno = (Spinner) findViewById(R.id.cboAno);
+		
+		btnAnos = (Button) findViewById(R.id.btnAno);
+		
 		carregarAnos();
+		
+		btnAnos.setOnClickListener(new View.OnClickListener() {
+			public void onClick(View v) {
+				dialogAnos.create().show();
+			}
+		});
 
 		txtCaptcha = (EditText) findViewById(R.id.txtCaptcha);
-
-		imgCaptcha = (ImageView) findViewById(R.id.imgCaptcha);
 		carregarCaptcha();
+		
+		// Futuro robô para ler o captcha.
+		//imgCaptcha = (ImageView) findViewById(R.id.imgCaptcha);
 
 		imgRecarregar = (ImageView) findViewById(R.id.imgRecarregar);
 		imgRecarregar.setOnClickListener(new View.OnClickListener() {
@@ -76,22 +72,26 @@ public class IRPFConsultaMain extends Activity {
 		});
 
 	}
-
+	
 	// Carrega a combo com os anos disponíveis no site da receita federal.
 	private void carregarAnos() {
 		new Handler().post(new Runnable() {
-
 			public void run() {
-				//RFConnection rfConnection = new RFConnection();
-				String[] anos = rfConnection.getAnosDisponiveisConsulta();
-
-				ArrayAdapter cboAdapter = new ArrayAdapter(
-						IRPFConsultaMain.this,
-						android.R.layout.simple_spinner_item, anos);
-				cboAdapter
-						.setDropDownViewResource(android.R.layout.simple_spinner_item);
-
-				cboAno.setAdapter(cboAdapter);
+				anosDisponiveis = rfConnection.getAnosDisponiveisConsulta();
+				
+				dialogAnos = new AlertDialog.Builder(IRPFConsultaMain.this)
+				.setTitle("Selecione o ano")
+				.setItems(anosDisponiveis, new DialogInterface.OnClickListener() {
+		            public void onClick(DialogInterface dialog, final int which) {
+		            	//final int id = which;
+		            	new Handler().post(new Runnable() {
+							public void run() {
+								btnAnos.setText(anosDisponiveis[which]);
+				            	btnAnos.invalidate();
+							}
+						});
+		            }
+		        });
 			}
 		});
 	}
@@ -124,45 +124,12 @@ public class IRPFConsultaMain extends Activity {
 			
 			public void run() {
 				PessoaFisica pessoa = new PessoaFisica(txtCpf.getText().toString(),
-						cboAno.getSelectedItem().toString(), txtCaptcha.getText()
+						btnAnos.getText().toString(), txtCaptcha.getText()
 								.toString());
 				//RFConnection rfConnection = new RFConnection();
 				rfConnection.consultarDadosRF(IRPFConsultaMain.this, pessoa);
 			}
 		});
-	}
-
-	// Gerenciamento de cookies, caso necessário. Não apagar ainda.
-	private void connectTest() throws ClientProtocolException, IOException {
-
-		HttpClient httpclient = new DefaultHttpClient();
-		// httpclient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY,
-		// new HttpHost("cache.fnde.gov.br", 80));
-
-		// HttpGet httpget = new
-		// HttpGet("http://www.receita.fazenda.gov.br/Aplicacoes/Atrjo/ConsRest/Atual.app/index.asp");
-		HttpGet httpget = new HttpGet(
-				"http://www.receita.fazenda.gov.br/scripts/srf/intercepta/captcha.aspx?opt=image");
-
-		CookieStore cookieStore = new BasicCookieStore();
-
-		HttpContext localContext = new BasicHttpContext();
-		localContext.setAttribute(ClientContext.COOKIE_STORE, cookieStore);
-
-		HttpResponse response = httpclient.execute(httpget, localContext);
-		// HttpResponse response = httpclient.execute(httpget);
-
-		for (Header h : response.getAllHeaders()) {
-			Log.i("livro", "HName: " + h.getName());
-			Log.i("livro", "HValue: " + h.getValue());
-
-		}
-
-		List<Cookie> cookies = cookieStore.getCookies();
-		for (Cookie c : cookies) {
-			Log.i("livro", "CNome:" + c.getName());
-			Log.i("livro", "CValor:" + c.getValue());
-		}
 	}
 
 	public static void logError(Throwable error) {

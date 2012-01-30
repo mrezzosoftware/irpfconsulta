@@ -57,7 +57,6 @@ public class RFConnection extends DefaultHttpClient {
 
 			HttpGet httpGet = new HttpGet(URL_TELA_COMBO_ANOS_RECEITA);
 
-			// HttpResponse httpResponse = execute(httpGet);
 			httpResponse = execute(httpGet);
 
 			HtmlCleaner cleaner = new HtmlCleaner();
@@ -97,7 +96,7 @@ public class RFConnection extends DefaultHttpClient {
 			// HttpHost("cache.fnde.gov.br", 80));
 
 			HttpGet httpGet = new HttpGet(url);
-
+			
 			httpResponse = execute(httpGet);
 
 			HttpEntity httpEntity = httpResponse.getEntity();
@@ -127,21 +126,10 @@ public class RFConnection extends DefaultHttpClient {
 
 			HttpPost httpPost = new HttpPost(URL_TELA_RESTITUICAO);
 			
-
-			// HttpResponse resposta = execute(httpPost);
-			
 			definirAtributosPost(httpPost, pessoa);
 			definirCabecalhosPost(httpPost);
-			for (Header h : httpPost.getAllHeaders()) {
-				IRPFConsultaMain.logInfo("Cabeçalho do HTTPPost: " + h.getName() + ":" + h.getValue());
-			}
 			
 			httpResponse = execute(httpPost);
-			
-			//IRPFConsultaMain.logInfo("EntityUtils: " + EntityUtils.toString(httpResponse.getEntity()));
-			
-			IRPFConsultaMain.logInfo("Status da página: "
-					+ httpResponse.getStatusLine());
 
 			BufferedReader bReader = new BufferedReader(new InputStreamReader(
 					httpResponse.getEntity().getContent()));
