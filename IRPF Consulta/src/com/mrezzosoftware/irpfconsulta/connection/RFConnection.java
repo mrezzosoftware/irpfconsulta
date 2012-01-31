@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +15,9 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.ProtocolException;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.RedirectHandler;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -26,6 +29,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
+import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 import org.htmlcleaner.CleanerProperties;
 import org.htmlcleaner.HtmlCleaner;
@@ -41,18 +45,24 @@ import android.text.Html;
 import android.widget.Toast;
 
 import com.mrezzosoftware.irpfconsulta.IRPFConsultaMain;
+import com.mrezzosoftware.irpfconsulta.pf.Declaracao;
 import com.mrezzosoftware.irpfconsulta.pf.PessoaFisica;
 
 public class RFConnection extends DefaultHttpClient {
 
-	private HttpResponse httpResponse;
 	public static final String URL_CAPTCHA_RECEITA = "http://www.receita.fazenda.gov.br/scripts/srf/intercepta/captcha.aspx?opt=image";
 	private static final String URL_TELA_COMBO_ANOS_RECEITA = "http://www.receita.fazenda.gov.br/Aplicacoes/Atrjo/ConsRest/Atual.app/index.asp";
 	private static final String URL_TELA_RESTITUICAO = "http://www.receita.fazenda.gov.br/Aplicacoes/Atrjo/ConsRest/Atual.app/RESTITUICAO.ASP";
+	private static final int NOME = 0;
+	private static final int DADOS_BANCARIOS = 1;
+	private static final int SITUACAO = 2;
+	private HttpResponse httpResponse;
+	private TagNode respostaXml;
 
 	public RFConnection() {
 		// Definição de Proxy. Comentar se estiver fora do FNDE.
-		//getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost("172.21.128.10", 80));
+		getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY,
+				new HttpHost("172.21.128.10", 80));
 	}
 
 	public String[] getAnosDisponiveisConsulta() {
@@ -123,47 +133,125 @@ public class RFConnection extends DefaultHttpClient {
 		return null;
 	}
 
-	public void consultarDadosRF(final Context ctx, final PessoaFisica pessoa) {
+	public Declaracao consultarDadosRF(final Context ctx,
+			final PessoaFisica pessoa) {
+
+		Declaracao declaracao = null;
+
 		try {
 
 			HttpPost httpPost = new HttpPost(URL_TELA_RESTITUICAO);
 
-			definirAtributosPost(httpPost, pessoa);
+			definirParametrosPost(httpPost, pessoa);
 			definirCabecalhosPost(httpPost);
 
 			httpResponse = execute(httpPost);
-			
-			//pesquisarxPathHttpResponse("//font[@class='txtNomeContribuinte']", 0);
-			pesquisarxPathHttpResponse("//td[@colspan='2']/font[@class='txtDadosContribuinte']", 1);
-			
-/*			BufferedReader bReader = new BufferedReader(new InputStreamReader(
-					httpResponse.getEntity().getContent()));
 
-			String line = "";
-			while ((line = bReader.readLine()) != null) {
-				IRPFConsultaMain.logInfo("Linha: " + line);
-			}*/
+			declaracao = retornarDeclaracao();
 
 		} catch (ClientProtocolException e) {
 			IRPFConsultaMain.logError(e);
 		} catch (IOException e) {
 			IRPFConsultaMain.logError(e);
 		}
+
+		return declaracao;
 	}
 
-	private void definirAtributosPost(HttpPost post, PessoaFisica pessoa)
+	private Declaracao retornarDeclaracao() {
+
+		Declaracao declaracao = new Declaracao();
+
+		String xPathNome = "//font[@class='txtNomeContribuinte']";
+		String xPathDadosBancarios = "//font[@class='txtInfBancoContribuinte2']";
+		String xPathSituacao = "//td[@colspan='2']/font[@class='txtDadosContribuinte']";
+
+		pesquisarxPathHttpResponse(declaracao, NOME, xPathNome);
+		pesquisarxPathHttpResponse(declaracao, DADOS_BANCARIOS,
+				xPathDadosBancarios);
+		pesquisarxPathHttpResponse(declaracao, SITUACAO, xPathSituacao);
+		respostaXml = null;
+
+		return declaracao;
+	}
+
+	private String pesquisarxPathHttpResponse(Declaracao declaracao,
+			int declaracaoInfo, String xPath) {
+
+		String resposta = "";
+		
+		try {
+
+			HtmlCleaner cleaner = new HtmlCleaner();
+			CleanerProperties props = cleaner.getProperties();
+			props.setAllowHtmlInsideAttributes(true);
+			props.setAllowMultiWordAttributes(true);
+			props.setRecognizeUnicodeChars(true);
+			props.setOmitComments(true);
+
+			respostaXml = (respostaXml == null) ? cleaner
+					.clean(new InputStreamReader(httpResponse.getEntity()
+							.getContent())) : respostaXml;
+
+			if (respostaXml.getText().toString().contains("Erro: CPF")) {
+				declaracao.setCodigoErro(Declaracao.CPF_INVALIDO);
+				return null;
+			} else if (respostaXml.getText().toString().contains("Página Inicial")) {
+				declaracao.setCodigoErro(Declaracao.CAPTCHA_INVALIDO);
+				return null;
+			} else if (declaracao.getCodigoErro() != Declaracao.OK) {
+				return null;
+			}
+
+			Object[] no = respostaXml.evaluateXPath(xPath);
+
+			if (declaracaoInfo == NOME) {
+
+				TagNode nome = (TagNode) no[0];
+				resposta = nome.getText().toString().trim();
+				declaracao.setNome(resposta);
+
+			} else if (declaracaoInfo == DADOS_BANCARIOS) {
+
+				declaracao.setBanco(((TagNode) no[0]).getText().toString()
+						.trim());
+				declaracao.setAgencia(((TagNode) no[1]).getText().toString()
+						.trim());
+				declaracao.setLote(((TagNode) no[2]).getText().toString()
+						.trim());
+				declaracao.setDataDisponivel(((TagNode) no[3]).getText()
+						.toString().trim());
+
+			} else if (declaracaoInfo == SITUACAO) {
+
+				TagNode situacao = (TagNode) no[1];
+				resposta = situacao.getText().toString().trim();
+				resposta = resposta.contains("Creditado") ? "Creditado" : "";
+				declaracao.setSituacao(resposta);
+
+			}
+
+		} catch (Exception e) {
+			IRPFConsultaMain.logError(e);
+		}
+
+		return resposta;
+	}
+
+	private void definirParametrosPost(HttpPost post, PessoaFisica pessoa)
 			throws UnsupportedEncodingException {
 
 		List<NameValuePair> parametros = new ArrayList<NameValuePair>(5);
 		parametros.add(new BasicNameValuePair("CPF", pessoa.getCpf()));
 		parametros.add(new BasicNameValuePair("exercicio", pessoa.getAno()));
 		parametros.add(new BasicNameValuePair("senha", pessoa.getCaptcha()));
-		parametros.add(new BasicNameValuePair("idSom", null));
+		parametros.add(new BasicNameValuePair("idSom", ""));
 		parametros.add(new BasicNameValuePair("btnConsultar", "Consultar"));
 
 		post.setEntity(new UrlEncodedFormEntity(parametros));
 
 	}
+
 	private void definirCabecalhosPost(HttpPost post) {
 
 		post.setHeader("Host", "www.receita.fazenda.gov.br");
@@ -185,41 +273,4 @@ public class RFConnection extends DefaultHttpClient {
 
 	}
 
-	
-	public void pesquisarxPathHttpResponse(String xPath, int indiceNo) {
-
-		try {
-
-			String xPathQuery = xPath;
-
-			HtmlCleaner cleaner = new HtmlCleaner();
-			CleanerProperties props = cleaner.getProperties();
-			props.setAllowHtmlInsideAttributes(true);
-			props.setAllowMultiWordAttributes(true);
-			props.setRecognizeUnicodeChars(true);
-			props.setOmitComments(true);
-
-			TagNode respostaXml = cleaner.clean(new InputStreamReader(
-					httpResponse.getEntity().getContent()));
-
-			Object[] no = respostaXml.evaluateXPath(xPathQuery);
-			TagNode nome = (TagNode) no[indiceNo];
-			String resposta = nome.getText().toString().trim();
-			resposta = resposta.contains("Creditado") ? "Creditado" : "";
-			IRPFConsultaMain.logInfo("Nome do CPF: " + resposta);
-
-/*			String[] anos;
-			if (noOptionAnos.length > 0) {
-				anos = new String[noOptionAnos.length];
-				for (int i = 0; i < noOptionAnos.length; i++) {
-					TagNode ano = (TagNode) noOptionAnos[i];
-					anos[i] = ano.getText().toString();
-				}
-			}*/
-
-		} catch (Exception e) {
-			IRPFConsultaMain.logError(e);
-		}
-	}
-	
 }

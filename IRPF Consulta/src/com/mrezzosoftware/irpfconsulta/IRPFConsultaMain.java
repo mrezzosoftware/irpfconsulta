@@ -3,6 +3,7 @@ package com.mrezzosoftware.irpfconsulta;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
@@ -15,6 +16,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.mrezzosoftware.irpfconsulta.connection.RFConnection;
+import com.mrezzosoftware.irpfconsulta.pf.Declaracao;
 import com.mrezzosoftware.irpfconsulta.pf.PessoaFisica;
 
 public class IRPFConsultaMain extends Activity {
@@ -28,7 +30,7 @@ public class IRPFConsultaMain extends Activity {
 	private Bitmap captcha;
 	private ImageView imgRecarregar;
 	// Futuro robô para ler o captcha.
-	//private ImageView imgCaptcha;
+	// private ImageView imgCaptcha;
 	private ImageButton btConsultar;
 	private RFConnection rfConnection = new RFConnection();
 
@@ -39,11 +41,11 @@ public class IRPFConsultaMain extends Activity {
 		setContentView(R.layout.irpfconsultamain);
 
 		txtCpf = (EditText) findViewById(R.id.txtCpf);
-		
+
 		btnAnos = (Button) findViewById(R.id.btnAno);
-		
+
 		carregarAnos();
-		
+
 		btnAnos.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				dialogAnos.create().show();
@@ -52,9 +54,9 @@ public class IRPFConsultaMain extends Activity {
 
 		txtCaptcha = (EditText) findViewById(R.id.txtCaptcha);
 		carregarCaptcha();
-		
+
 		// Futuro robô para ler o captcha.
-		//imgCaptcha = (ImageView) findViewById(R.id.imgCaptcha);
+		// imgCaptcha = (ImageView) findViewById(R.id.imgCaptcha);
 
 		imgRecarregar = (ImageView) findViewById(R.id.imgRecarregar);
 		imgRecarregar.setOnClickListener(new View.OnClickListener() {
@@ -72,26 +74,29 @@ public class IRPFConsultaMain extends Activity {
 		});
 
 	}
-	
+
 	// Carrega a combo com os anos disponíveis no site da receita federal.
 	private void carregarAnos() {
 		new Handler().post(new Runnable() {
 			public void run() {
 				anosDisponiveis = rfConnection.getAnosDisponiveisConsulta();
 				
+				btnAnos.setText((anosDisponiveis.length > 0) ? anosDisponiveis[0] : "Anos");
+				
 				dialogAnos = new AlertDialog.Builder(IRPFConsultaMain.this)
-				.setTitle("Selecione o ano")
-				.setItems(anosDisponiveis, new DialogInterface.OnClickListener() {
-		            public void onClick(DialogInterface dialog, final int which) {
-		            	//final int id = which;
-		            	new Handler().post(new Runnable() {
-							public void run() {
-								btnAnos.setText(anosDisponiveis[which]);
-				            	btnAnos.invalidate();
-							}
-						});
-		            }
-		        });
+						.setTitle("Selecione o ano").setItems(anosDisponiveis,
+								new DialogInterface.OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											final int which) {
+										// final int id = which;
+										new Handler().post(new Runnable() {
+											public void run() {
+												btnAnos.setText(anosDisponiveis[which]);
+												btnAnos.invalidate();
+											}
+										});
+									}
+								});
 			}
 		});
 	}
@@ -101,7 +106,7 @@ public class IRPFConsultaMain extends Activity {
 		new Handler().post(new Runnable() {
 			public void run() {
 
-				//RFConnection rfConnection = new RFConnection();
+				// RFConnection rfConnection = new RFConnection();
 				captcha = rfConnection
 						.getImage(RFConnection.URL_CAPTCHA_RECEITA);
 
@@ -120,14 +125,30 @@ public class IRPFConsultaMain extends Activity {
 	}
 
 	protected void consultarDados() {
+
 		new Handler().post(new Runnable() {
-			
+
 			public void run() {
-				PessoaFisica pessoa = new PessoaFisica(txtCpf.getText().toString(),
-						btnAnos.getText().toString(), txtCaptcha.getText()
-								.toString());
-				//RFConnection rfConnection = new RFConnection();
-				rfConnection.consultarDadosRF(IRPFConsultaMain.this, pessoa);
+				PessoaFisica pessoa = new PessoaFisica(txtCpf.getText()
+						.toString(), btnAnos.getText().toString(), txtCaptcha
+						.getText().toString());
+				// RFConnection rfConnection = new RFConnection();
+				Declaracao declaracao = rfConnection.consultarDadosRF(
+						IRPFConsultaMain.this, pessoa);
+				if (declaracao != null) {
+					if (declaracao.getCodigoErro() == Declaracao.CPF_INVALIDO) {
+						Toast.makeText(IRPFConsultaMain.this, "CPF inválido!", Toast.LENGTH_SHORT).show();
+						return;
+					} else if (declaracao.getCodigoErro() == Declaracao.CAPTCHA_INVALIDO) {
+						Toast.makeText(IRPFConsultaMain.this, "Captcha incorreto!", Toast.LENGTH_SHORT).show();
+						return;
+					}
+					
+					Intent intentResultado = new Intent(IRPFConsultaMain.this,
+							IRPFResultadoConsulta.class);
+					intentResultado.putExtra("declaracao", declaracao);
+					startActivity(intentResultado);
+				}
 			}
 		});
 	}
