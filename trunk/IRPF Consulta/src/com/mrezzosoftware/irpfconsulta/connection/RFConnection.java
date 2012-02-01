@@ -56,13 +56,30 @@ public class RFConnection extends DefaultHttpClient {
 	private static final int NOME = 0;
 	private static final int DADOS_BANCARIOS = 1;
 	private static final int SITUACAO = 2;
+	private static final String xPathNome = "//font[@class='txtNomeContribuinte']";
+	private static final String xPathDadosBancarios = "//font[@class='txtInfBancoContribuinte2']";
+	private static final String xPathSituacao = "//td[@colspan='2']/font[@class='txtDadosContribuinte']";
 	private HttpResponse httpResponse;
 	private TagNode respostaXml;
 
 	public RFConnection() {
-		// Definição de Proxy. Comentar se estiver fora do FNDE.
-		getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY,
-				new HttpHost("172.21.128.10", 80));
+		// DefiniÃ§Ã£o de Proxy. Comentar se estiver fora do FNDE.
+		//getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost("172.21.128.10", 80));
+		//getParams().setParameter(ClientPNames.COOKIE_POLICY, CookiePolicy.BROWSER_COMPATIBILITY);
+	}
+	
+	public void resetar() {
+		try {
+			
+			getConnectionManager().shutdown();
+			HttpGet httpGet = new HttpGet(URL_TELA_COMBO_ANOS_RECEITA);
+			execute(httpGet);
+			
+		} catch (ClientProtocolException e) {
+			IRPFConsultaMain.logError(e);
+		} catch (IOException e) {
+			IRPFConsultaMain.logError(e);
+		}
 	}
 
 	public String[] getAnosDisponiveisConsulta() {
@@ -161,16 +178,19 @@ public class RFConnection extends DefaultHttpClient {
 	private Declaracao retornarDeclaracao() {
 
 		Declaracao declaracao = new Declaracao();
+		respostaXml = null;
 
-		String xPathNome = "//font[@class='txtNomeContribuinte']";
-		String xPathDadosBancarios = "//font[@class='txtInfBancoContribuinte2']";
-		String xPathSituacao = "//td[@colspan='2']/font[@class='txtDadosContribuinte']";
-
+		IRPFConsultaMain.logInfo("respostaXml: " + (respostaXml == null));
 		pesquisarxPathHttpResponse(declaracao, NOME, xPathNome);
+		
+		if (declaracao.getCodigoRetorno() != Declaracao.OK) {
+			IRPFConsultaMain.logInfo("Retorna declaracao. CodErro: " + declaracao.getCodigoRetorno());
+			return declaracao;
+		}
+		
 		pesquisarxPathHttpResponse(declaracao, DADOS_BANCARIOS,
 				xPathDadosBancarios);
 		pesquisarxPathHttpResponse(declaracao, SITUACAO, xPathSituacao);
-		respostaXml = null;
 
 		return declaracao;
 	}
@@ -178,7 +198,8 @@ public class RFConnection extends DefaultHttpClient {
 	private String pesquisarxPathHttpResponse(Declaracao declaracao,
 			int declaracaoInfo, String xPath) {
 
-		String resposta = "";
+		String noString = "";
+		Object[] no = null;
 		
 		try {
 
@@ -192,24 +213,45 @@ public class RFConnection extends DefaultHttpClient {
 			respostaXml = (respostaXml == null) ? cleaner
 					.clean(new InputStreamReader(httpResponse.getEntity()
 							.getContent())) : respostaXml;
+					
+			IRPFConsultaMain.logInfo("RespostaXML: " + respostaXml.getText().toString());
 
+			if (respostaXml.getText().toString().contains("Erro na Habilitaï¿½ï¿½o do Usuï¿½rio")) {
+				declaracao.setCodigoRetorno(Declaracao.ERRO_HABILITACAO);
+			}
+			
+			// Verica os erros retornados pelo site da Receita Federal
 			if (respostaXml.getText().toString().contains("Erro: CPF")) {
-				declaracao.setCodigoErro(Declaracao.CPF_INVALIDO);
-				return null;
-			} else if (respostaXml.getText().toString().contains("Página Inicial")) {
-				declaracao.setCodigoErro(Declaracao.CAPTCHA_INVALIDO);
-				return null;
-			} else if (declaracao.getCodigoErro() != Declaracao.OK) {
-				return null;
+				declaracao.setCodigoRetorno(Declaracao.CPF_INVALIDO);
+			} else if (respostaXml.getText().toString().contains("PÃ¡gina Inicial")) {
+				declaracao.setCodigoRetorno(Declaracao.CAPTCHA_INVALIDO);
+			}
+			
+			// Verifica qual o tipo da declaracao
+			if (respostaXml.getText().toString().contains("Saldo inexistente")) {
+				declaracao.setCodigoRetorno(Declaracao.SEM_SALDO);
+				declaracao.setSituacao("Saldo inexistente de imposto a pagar ou a restituir.");
+				
+				no = respostaXml.evaluateXPath(xPath);
+				TagNode noNome = (TagNode) no[0];
+				noString = noNome.getText().toString().trim();
+				declaracao.setNome(noString);
 			}
 
-			Object[] no = respostaXml.evaluateXPath(xPath);
+			
+			if (declaracao.getCodigoRetorno() != Declaracao.OK) {
+				IRPFConsultaMain.logInfo("Retorna null xpath. CodErro: " + declaracao.getCodigoRetorno());
+				return null;
+			}
+				
+			
+			no = respostaXml.evaluateXPath(xPath);
 
 			if (declaracaoInfo == NOME) {
 
-				TagNode nome = (TagNode) no[0];
-				resposta = nome.getText().toString().trim();
-				declaracao.setNome(resposta);
+				TagNode noNome = (TagNode) no[0];
+				noString = noNome.getText().toString().trim();
+				declaracao.setNome(noString);
 
 			} else if (declaracaoInfo == DADOS_BANCARIOS) {
 
@@ -225,9 +267,9 @@ public class RFConnection extends DefaultHttpClient {
 			} else if (declaracaoInfo == SITUACAO) {
 
 				TagNode situacao = (TagNode) no[1];
-				resposta = situacao.getText().toString().trim();
-				resposta = resposta.contains("Creditado") ? "Creditado" : "";
-				declaracao.setSituacao(resposta);
+				noString = situacao.getText().toString().trim();
+				noString = noString.contains("Creditado") ? "Creditado" : "";
+				declaracao.setSituacao(noString);
 
 			}
 
@@ -235,7 +277,7 @@ public class RFConnection extends DefaultHttpClient {
 			IRPFConsultaMain.logError(e);
 		}
 
-		return resposta;
+		return noString;
 	}
 
 	private void definirParametrosPost(HttpPost post, PessoaFisica pessoa)
@@ -244,7 +286,7 @@ public class RFConnection extends DefaultHttpClient {
 		List<NameValuePair> parametros = new ArrayList<NameValuePair>(5);
 		parametros.add(new BasicNameValuePair("CPF", pessoa.getCpf()));
 		parametros.add(new BasicNameValuePair("exercicio", pessoa.getAno()));
-		parametros.add(new BasicNameValuePair("senha", pessoa.getCaptcha()));
+		parametros.add(new BasicNameValuePair("Senha", pessoa.getCaptcha()));
 		parametros.add(new BasicNameValuePair("idSom", ""));
 		parametros.add(new BasicNameValuePair("btnConsultar", "Consultar"));
 
@@ -269,7 +311,7 @@ public class RFConnection extends DefaultHttpClient {
 		// post.setHeader("Cookie",
 		// "ASPSESSIONIDQQDCADDC=HOOFJOMBOKJLOPPPKIEOGIBE; cookieCaptcha=BWP6pWB8SoVeT/PdiBSAWs5taWeojZH5g0rWwh0XWPA=");
 		post.setHeader("Content-Type", "application/x-www-form-urlencoded");
-		// post.setHeader("Content-Length", "71");
+		//post.setHeader("Content-Length", "71");
 
 	}
 
