@@ -10,25 +10,29 @@ public class Declaracao implements Serializable{
 	private String lote;
 	private String dataDisponivel;
 	private String situacao;
-	private int codigoErro = OK;
+	private int codigoRetorno;
 
+	public static final int ERRO_HABILITACAO = -7;
 	public static final int OK = 0;
 	public static final int CPF_INVALIDO = 1;
 	public static final int CAPTCHA_INVALIDO = 2;
+	public static final int SEM_SALDO = 3;
 	
 	public Declaracao(String nome, String banco, String agencia, String lote,
-			String dataDisponivel, String situacao, int codigoErro) {
-		super();
+			String dataDisponivel, String situacao, int codigoRetorno) {
+		
 		this.nome = nome;
 		this.banco = banco;
 		this.agencia = agencia;
 		this.lote = lote;
 		this.dataDisponivel = dataDisponivel;
 		this.situacao = situacao;
-		this.codigoErro = codigoErro;
+		this.codigoRetorno = codigoRetorno;
 	}
 	
-	public Declaracao() {}
+	public Declaracao() {
+		this("","","","","","",0);
+	}
 
 	
 	
@@ -80,11 +84,11 @@ public class Declaracao implements Serializable{
 		this.situacao = situacao;
 	}
 
-	public int getCodigoErro() {
-		return codigoErro;
+	public int getCodigoRetorno() {
+		return codigoRetorno;
 	}
 
-	public void setCodigoErro(int codigoErro) {
-		this.codigoErro = codigoErro;
+	public void setCodigoRetorno(int codigoRetorno) {
+		this.codigoRetorno = codigoRetorno;
 	}
 }

@@ -38,5 +38,8 @@ public class IRPFResultadoConsulta extends Activity {
 		lblLote.setText(lblLote.getText() + declaracao.getLote());
 		lblDisponivel.setText(lblDisponivel.getText() + declaracao.getDataDisponivel());
 		lblSituacao.setText(lblSituacao.getText() + declaracao.getSituacao());
+		
+		getIntent().removeExtra("declaracao");
+		IRPFConsultaMain.reciclarObjeto(declaracao);
 	}
 }
